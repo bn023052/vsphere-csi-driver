@@ -477,23 +477,10 @@ var (
 	envZonal3StoragePolicyName            = "ZONAL3_STORAGE_POLICY_IMM"
 	topologyDomainIsolation               = "Workload_Management_Isolation"
 	envIsolationSharedStoragePolicyName   = "WORKLOAD_ISOLATION_SHARED_STORAGE_POLICY"
-	envSharedZone2Zone4StoragePolicyName  = "SHARED_ZONE2_ZONE4_STORAGE_POLICY_IMM"
-	envSharedZone2Zone4DatastoreUrl       = "SHARED_ZONE2_ZONE4_DATASTORE_URL"
-)
-
-// storage policy usages for storage quota validation
-var usageSuffixes = []string{
-	"-pvc-usage",
-	"-latebinding-pvc-usage",
-	"-snapshot-usage",
-	"-latebinding-snapshot-usage",
-	"-vm-usage",
-	"-latebinding-vm-usage",
-}
-
-const (
-	storagePolicyUsagePollInterval = 10 * time.Second
-	storagePolicyUsagePollTimeout  = 1 * time.Minute
+	envIsolationSharedStoragePolicyNameLateBidning = "WORKLOAD_ISOLATION_SHARED_STORAGE_POLICY_WFFC"
+	envZonal2DatastoreUrl                = "ZONAL2_DATASTORE_URL"
+	envZone3DatastoreName                = "ZONE3_DATASTORE_NAME"
+	envZone2DatastoreName				 = "ZONE2_DATASTORE_NAME"
 )
 
 // GetAndExpectEnvVar returns the value of an environment variable or fails the regression if it's not set.
