@@ -4076,9 +4076,6 @@ func getK8sMasterIPs(ctx context.Context, client clientset.Interface) []string {
 					k8sMasterIPs = append(k8sMasterIPs, addr.Address)
 				}
 			}
-		} else {
-			framework.Logf(
-				"Waiting for 'kube-controller-manager' controller pod to come up within %v seconds", pollTimeout*2)
 		}
 	}
 	gomega.Expect(k8sMasterIPs).NotTo(gomega.BeEmpty(), "Unable to find k8s control plane IP")
@@ -7624,7 +7621,9 @@ func getPortNumAndIP(ip string) (string, string, error) {
 	return ip, port, nil
 }
 
-
+/*
+Migrate VM to another datastore using govc
+*/
 func migrateVmsToDatastore(masterIp string, sshClientConfig *ssh.ClientConfig,
 	destDatastore string, vMsToMigrate []string, dcName string) (bool, error) {
 	var migrateVm string

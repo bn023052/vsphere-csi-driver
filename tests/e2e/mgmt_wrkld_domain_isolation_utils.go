@@ -503,7 +503,7 @@ func verifyVmServiceVmAnnotationAffinity(vm *vmopv1.VirtualMachine, allowedTopol
 
 
 /*
-Add zone to namespace without checking the statuscode
+Add zone to supervisor
 */
 func addZoneToWcp(zoneName string, vcRestSessionId string, supervisorId string) error {
 	vcIp := e2eVSphere.Config.Global.VCenterHostname

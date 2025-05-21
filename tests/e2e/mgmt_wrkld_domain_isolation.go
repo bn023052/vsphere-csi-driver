@@ -886,7 +886,8 @@ var _ bool = ginkgo.Describe("[domain-isolation] Management-Workload-Domain-Isol
 	/*
 		Testcase-3 from Negative scenario
 		Add tests for all supported operations on PVC
-		Ex: Snapshot create/delete, restore snapshot, expand, migrate, attach/detach etc with zone marked for delete with both zonal policy and shared datastore policy
+		Ex: Snapshot create/delete, restore snapshot, expand, migrate, attach/detach with zone marked for delete.
+		Use both zonal policy and shared datastore policy
 	*/
 
 	ginkgo.It("Run all supported operations on PVC", func() {
@@ -902,11 +903,11 @@ var _ bool = ginkgo.Describe("[domain-isolation] Management-Workload-Domain-Isol
 		storagePolicyNameZ2 := GetAndExpectStringEnvVar(envZonal2StoragePolicyNameLateBidning)
 		storageProfileIdZ2 := e2eVSphere.GetSpbmPolicyID(storagePolicyNameZ2)
 
-		// append late-binding now as it knowns to k8s and not to vc
+		// append late-binding now as it known to k8s and not to vc
 		storagePolicyNameZ2 = storagePolicyNameZ2 + "-latebinding"
 
 		// read datastore url
-		//zonal2DsUrl := os.Getenv(envZonal2DatastoreUrl)
+		zonal2DsUrl := os.Getenv(envZonal2DatastoreUrl)
 
 		ginkgo.By("Create a WCP namespace tagged to zone-1 & zone-2")
 		namespace, statuscode, err = createtWcpNsWithZonesAndPolicies(vcRestSessionId,
@@ -1010,7 +1011,7 @@ var _ bool = ginkgo.Describe("[domain-isolation] Management-Workload-Domain-Isol
 			false, true, "", "", sharedStorageclass, sharedStorageclass.Name)
 
 		ginkgo.By("Restore a volume snapshot")
-		restoredPvc, _, _:= verifyVolumeRestoreOperation(ctx, client, namespace, sharedStorageclass,
+		restoredPvc, restoredPv, _:= verifyVolumeRestoreOperation(ctx, client, namespace, sharedStorageclass,
 			volumeSnapshot1, diskSize, false)
 
 		ginkgo.By("Trigger offline expansion")
@@ -1021,7 +1022,7 @@ var _ bool = ginkgo.Describe("[domain-isolation] Management-Workload-Domain-Isol
 		pvclaim2, err = expandPVCSize(restoredPvc, newSize, client)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(pvclaim2).NotTo(gomega.BeNil())
-		/*
+		
 		ginkgo.By("Relocate volume from one datastore to another datastore using" +
 			"CnsRelocateVolume API")
 		dsRefDest := getDsMoRefFromURL(ctx, zonal2DsUrl)
@@ -1029,7 +1030,7 @@ var _ bool = ginkgo.Describe("[domain-isolation] Management-Workload-Domain-Isol
 		_, err = e2eVSphere.cnsRelocateVolume(e2eVSphere, ctx, volumeID, dsRefDest)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		e2eVSphere.verifyDatastoreMatch(volumeID, []string{zonal2DsUrl})
-		*/
+		
 		ginkgo.By("Power off vm")
 		vm = setVmPowerState(ctx, vmopC, vm, vmopv1.VirtualMachinePoweredOff)
 		vm, err = wait4Vm2ReachPowerStateInSpec(ctx, vmopC, vm)
@@ -1045,7 +1046,9 @@ var _ bool = ginkgo.Describe("[domain-isolation] Management-Workload-Domain-Isol
 
 	/*
 		Testcase-5 from Negative scenario
-		Perform out of band operation on VMservice VM with attached PVCs(relocate VM using VM API) to the zone (both in the same namespace
+		Perform out of band operation on VMservice VM with attached PVCs.
+		
+		relocate VM using VM API to the zone (both in the same namespace
 		and with/without marked for removal of zone in the same namespace)
 	*/
 
