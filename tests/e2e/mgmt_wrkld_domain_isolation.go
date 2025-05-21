@@ -1152,9 +1152,6 @@ var _ bool = ginkgo.Describe("[domain-isolation] Management-Workload-Domain-Isol
 		isMigrateSuccess2, err := migrateVmsToDatastore(svcMasterIp, sshClientConfig, zone2DsName, []string{vm2.Name}, dcName)
 		gomega.Expect(isMigrateSuccess2).To(gomega.BeTrue(), "Migration of vms failed")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		// cleanup
-
 		
 	})
 
