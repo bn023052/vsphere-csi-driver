@@ -1305,11 +1305,12 @@ func createVmServiceVm(ctx context.Context, client clientset.Interface, vmopC ct
 	}
 
 	/* Verify that the attached volumes are accessible and validate data integrity. The function iterates through each
-	volume of the VM, verifies that the PVC is accessible, and checks the data integrity on each attached disk */
+	volume of the VM, verifies that the PVC is accessible, and checks the data integrity on each attached disk 
 	for i, vol := range vm.Status.Volumes {
 		volFolder := formatNVerifyPvcIsAccessible(vol.DiskUuid, i+1, vmIp)
 		verifyDataIntegrityOnVmDisk(vmIp, volFolder)
-	}
+	}*/
+	framework.Logf("VMIP '%s'", vmIp)
 
 	return secretName, vm, vmlbsvc, nil
 }

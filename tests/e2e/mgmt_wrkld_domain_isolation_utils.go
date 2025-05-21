@@ -183,10 +183,30 @@ func checkPvcTopologyAnnotationOnSvc(svcPVC *v1.PersistentVolumeClaim,
 				}
 			}
 		}
+	} else if requestedTopoString, y := annotationsMap[tkgHARequestedAnnotationKey]; y {
+		availabilityTopo := strings.Split(requestedTopoString, ",")
+		for _, avlTopo := range availabilityTopo {
+			requestedTopology := strings.Split(avlTopo, ":")
+			topoKey := strings.Split(requestedTopology[0], "{")[1]
+			topoVal := strings.Split(requestedTopology[1], "}")[0]
+			category := strings.SplitAfter(topoKey, "/")[1]
+			categoryKey := strings.Split(category, `"`)[0]
+			if isValuePresentInTheList(categories, categoryKey) {
+				if isValuePresentInTheList(allowedTopologies[topoKey], topoVal) {
+					return fmt.Errorf("couldn't find allowed accessible topology: %v on svc pvc: %s"+
+						"instead found: %v", allowedTopologies[topoKey], svcPVC.Name, topoVal)
+				}
+			} else {
+				return fmt.Errorf("couldn't find key: %s on allowed categories %v",
+					category, categories)
+			}
+		}
 	} else {
 		return fmt.Errorf("couldn't find annotation key: %s on svc pvc: %s",
 			tkgHAccessibleAnnotationKey, svcPVC.Name)
 	}
+
+	
 	return nil
 }
 
@@ -479,4 +499,25 @@ func verifyVmServiceVmAnnotationAffinity(vm *vmopv1.VirtualMachine, allowedTopol
 	}
 
 	return nil
+}
+
+
+/*
+Add zone to namespace without checking the statuscode
+*/
+func addZoneToWcp(zoneName string, vcRestSessionId string, supervisorId string) error {
+	vcIp := e2eVSphere.Config.Global.VCenterHostname
+	initialUrl := "https://" + vcIp + "/api/vcenter/namespace-management/supervisors/" + supervisorId + "/zones/bindings"
+
+	// Create the request body with zone name inside a zones array
+	reqBody := fmt.Sprintf(`{
+        "zones": [{"name": "%s"}]
+    }`, zoneName)
+
+	// Print the request body for debugging
+	fmt.Println(reqBody)
+
+	// Make the API request
+	_, statusCode := invokeVCRestAPIPatchRequest(vcRestSessionId, initialUrl, reqBody)
+	return checkStatusCode(204, statusCode)
 }
