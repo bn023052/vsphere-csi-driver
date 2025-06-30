@@ -289,8 +289,7 @@ var _ = ginkgo.Describe("[csi-block-vanilla] [csi-file-vanilla] [csi-block-vanil
 		defer cancel()
 
 		var pvclaim *v1.PersistentVolumeClaim
-		var storageclasspvc2 *storagev1.StorageClass
-		var pvclaim2 *v1.PersistentVolumeClaim
+		var storageclasspvc *storagev1.StorageClass
 		var err error
 
 		ginkgo.By("Setting the cluster-distribution name having more than 128 characters")
@@ -308,13 +307,13 @@ var _ = ginkgo.Describe("[csi-block-vanilla] [csi-file-vanilla] [csi-block-vanil
 
 		ginkgo.By("Creating a PVC")
 		scParameters[scParamDatastoreURL] = datastoreURL
-		_, pvclaim, err = createPVCAndStorageClass(ctx, client,
+		storageclasspvc, pvclaim, err = createPVCAndStorageClass(ctx, client,
 			namespace, nil, scParameters, diskSize, nil, "", false, "")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		defer func() {
 			err := client.StorageV1().StorageClasses().Delete(ctx,
-				storageclasspvc2.Name, *metav1.NewDeleteOptions(0))
+				storageclasspvc.Name, *metav1.NewDeleteOptions(0))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}()
 
@@ -323,14 +322,17 @@ var _ = ginkgo.Describe("[csi-block-vanilla] [csi-file-vanilla] [csi-block-vanil
 			v1.ClaimPending, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, time.Minute/2)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		expectedErrMsg := "length exceeds limitation"
+		// Wait for sometime to get the event on the PVC
+		time.Sleep(130 * time.Second)
+
+		expectedErrMsg := "A specified parameter was not correct: createSpecs.metadata.containerCluster.clusterDistribution"
 		framework.Logf("Expected failure message: %+q", expectedErrMsg)
 		errorOccurred := checkEventsforError(client, pvclaim.Namespace,
 			metav1.ListOptions{FieldSelector: fmt.Sprintf("involvedObject.name=%s", pvclaim.Name)}, expectedErrMsg)
 		gomega.Expect(errorOccurred).To(gomega.BeTrue())
 
 		defer func() {
-			err = fpv.DeletePersistentVolumeClaim(ctx, client, pvclaim2.Name, pvclaim2.Namespace)
+			err = fpv.DeletePersistentVolumeClaim(ctx, client, pvclaim.Name, pvclaim.Namespace)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}()
 	})
