@@ -32,6 +32,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
 	fdep "k8s.io/kubernetes/test/e2e/framework/deployment"
+	fpod "k8s.io/kubernetes/test/e2e/framework/pod"
 	fpv "k8s.io/kubernetes/test/e2e/framework/pv"
 	fss "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -141,6 +142,57 @@ var _ bool = ginkgo.Describe("[tkg-domain-isolation] TKG-Management-Workload-Dom
 		for _, item := range eventList.Items {
 			framework.Logf("%q", item.Message)
 		}
+	})
+
+	/*
+		TKG - Testcase-8
+		Create a RWX volume
+
+		Test Steps:
+		1. Assign the zonal policy of zone-1 and zone-2 to tkg namespace.
+		2. Create RWX PVC by specifying the requested allowed topology to be zone-2
+		3. Wait for PVC to reach Bound state.
+		4. Verify PVCs annotation and PV topology affinity details.
+		5. Create deployment pods with replica count 3 using pvc created above.
+		6. Verify Pod node annotation.
+		7. Perform cleanup by deleting the Pods, Volumes, and Namespace.
+	*/
+	ginkgo.It("Create a RWX volume", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		zonal1And2StroragePolicyName := GetAndExpectStringEnvVar(envZonal1And2PolicyName)
+		zonal1And2Sc, err := client.StorageV1().StorageClasses().Get(ctx, zonal1And2StroragePolicyName, metav1.GetOptions{})
+		if !apierrors.IsNotFound(err) {
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		}
+
+		ginkgo.By("Creating RWX- pvc with requested topology annotation set to zone2")
+		pvclaim1, err := createPvcWithRequestedTopology(ctx, client, namespace, nil, "", zonal1And2Sc, v1.ReadWriteMany, zone2)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("Wait for PVC to reach Bound state.")
+		_, err = fpv.WaitForPVClaimBoundPhase(ctx, client,
+			[]*v1.PersistentVolumeClaim{pvclaim1}, framework.ClaimProvisionTimeout)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("Creating a Deployment using pvc-1")
+		dep, err := createDeployment(ctx, client, 3, labelsMap, nil, namespace,
+			[]*v1.PersistentVolumeClaim{pvclaim1}, execRWXCommandPod1, false, busyBoxImageOnGcr)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		_, err = fdep.GetPodsForDeployment(ctx, client, dep)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		topValStartIndex := 0
+		topValEndIndex := 1
+		allowedTopologiesZ2 := setSpecificAllowedTopology(allowedTopologies, topkeyStartIndex, topValStartIndex,
+			topValEndIndex)
+
+		ginkgo.By("Verify pod node attachment")
+		err = verifyPvcAnnotationPvAffinityPodAnnotationInSvc(ctx, client, nil, nil, dep, namespace,
+			allowedTopologiesZ2)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 	})
 
 	/*
@@ -576,57 +628,6 @@ var _ bool = ginkgo.Describe("[tkg-domain-isolation] TKG-Management-Workload-Dom
 	})
 
 	/*
-		TKG - Testcase-8
-		Create a RWX volume
-
-		Test Steps:
-		1. Assign the zonal policy of zone-1 and zone-2 to tkg namespace.
-		2. Create RWX PVC by specifying the requested allowed topology to be zone-2
-		3. Wait for PVC to reach Bound state.
-		4. Verify PVCs annotation and PV topology affinity details.
-		5. Create deployment pods with replica count 3 using pvc created above.
-		6. Verify Pod node annotation.
-		7. Perform cleanup by deleting the Pods, Volumes, and Namespace.
-	*/
-	ginkgo.It("Create a RWX volume", func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		zonal1And2StroragePolicyName := GetAndExpectStringEnvVar(envZonal1And2PolicyName)
-		zonal1And2Sc, err := client.StorageV1().StorageClasses().Get(ctx, zonal1And2StroragePolicyName, metav1.GetOptions{})
-		if !apierrors.IsNotFound(err) {
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		}
-
-		ginkgo.By("Creating RWX- pvc with requested topology annotation set to zone2")
-		pvclaim1, err := createPvcWithRequestedTopology(ctx, client, namespace, nil, "", zonal1And2Sc, v1.ReadWriteMany, zone2)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		ginkgo.By("Wait for PVC to reach Bound state.")
-		_, err = fpv.WaitForPVClaimBoundPhase(ctx, client,
-			[]*v1.PersistentVolumeClaim{pvclaim1}, framework.ClaimProvisionTimeout)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		ginkgo.By("Creating a Deployment using pvc-1")
-		dep, err := createDeployment(ctx, client, 3, labelsMap, nil, namespace,
-			[]*v1.PersistentVolumeClaim{pvclaim1}, execRWXCommandPod1, false, busyBoxImageOnGcr)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		_, err = fdep.GetPodsForDeployment(ctx, client, dep)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		topValStartIndex := 0
-		topValEndIndex := 2
-		allowedTopologiesZ1Z2 := setSpecificAllowedTopology(allowedTopologies, topkeyStartIndex, topValStartIndex,
-			topValEndIndex)
-
-		ginkgo.By("Verify pod node attachment")
-		err = verifyPvcAnnotationPvAffinityPodAnnotationInSvc(ctx, client, nil, nil, dep, namespace,
-			allowedTopologiesZ1Z2)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-	})
-
-	/*
 		TKG - Testcase-15
 		Verify dynamic volume provisioning works and pods can use the file volume
 
@@ -650,36 +651,49 @@ var _ bool = ginkgo.Describe("[tkg-domain-isolation] TKG-Management-Workload-Dom
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		zonal1And2StroragePolicyName := GetAndExpectStringEnvVar(envZonal1And2PolicyName)
-		zonal1And2Sc, err := client.StorageV1().StorageClasses().Get(ctx, zonal1And2StroragePolicyName, metav1.GetOptions{})
+		sharedVsanPolicy := GetAndExpectStringEnvVar(envSharedZone1Zone2Zone3StoragePolicyName)
+		sharedVsanStorageClass, err := client.StorageV1().StorageClasses().Get(ctx, sharedVsanPolicy, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}
 
-		ginkgo.By("Creating RWX- pvc with requested topology annotation set to zone2")
-		pvclaim1, err := createPvcWithRequestedTopology(ctx, client, namespace, nil, "", zonal1And2Sc, v1.ReadWriteMany, zone2)
+		ginkgo.By("Create a PVC-1 with RWX access mode using the storage policy tagged to gc ns")
+		pvc1, err := createPVC(ctx, client, namespace, labelsMap, "", sharedVsanStorageClass, "")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Wait for PVC to reach Bound state.")
 		_, err = fpv.WaitForPVClaimBoundPhase(ctx, client,
-			[]*v1.PersistentVolumeClaim{pvclaim1}, framework.ClaimProvisionTimeout)
+			[]*v1.PersistentVolumeClaim{pvc1}, framework.ClaimProvisionTimeout)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		ginkgo.By("Creating a Deployment using pvc-1")
-		dep, err := createDeployment(ctx, client, 3, labelsMap, nil, namespace,
-			[]*v1.PersistentVolumeClaim{pvclaim1}, execRWXCommandPod1, false, busyBoxImageOnGcr)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		_, err = fdep.GetPodsForDeployment(ctx, client, dep)
+		ginkgo.By("Create a PVC-2 with ReadOnlyMany access mode using the storage policy tagged to gc ns")
+		pvc2, err := createPVC(ctx, client, namespace, labelsMap, "", sharedVsanStorageClass, v1.ReadOnlyMany)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		topValStartIndex := 0
-		topValEndIndex := 2
-		allowedTopologiesZ1Z2 := setSpecificAllowedTopology(allowedTopologies, topkeyStartIndex, topValStartIndex,
-			topValEndIndex)
+		ginkgo.By("Wait for PVC to reach Bound state.")
+		_, err = fpv.WaitForPVClaimBoundPhase(ctx, client,
+			[]*v1.PersistentVolumeClaim{pvc2}, framework.ClaimProvisionTimeout)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// Create a Pod to use the PVCs created above
+		ginkgo.By("Creating pod to attach PV to the node")
+		pod := fpod.MakePod(namespace, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2},
+			admissionapi.LevelBaseline, execRWXCommandPod1)
+
+		pod.Spec.Containers[0].VolumeMounts[0] = v1.VolumeMount{Name: "volume1", MountPath: "/mnt/" + "volume1"}
+		pod.Spec.Volumes[0] = v1.Volume{Name: "volume1", VolumeSource: v1.VolumeSource{
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc1.Name, ReadOnly: false}}}
+
+		pod.Spec.Containers[0].VolumeMounts[1] = v1.VolumeMount{Name: "volume2", MountPath: "/mnt/" + "volume2"}
+		pod.Spec.Volumes[1] = v1.Volume{Name: "volume2", VolumeSource: v1.VolumeSource{
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc2.Name, ReadOnly: true}}}
+
+		pod, err = client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Verify pod node attachment")
-		err = verifyPvcAnnotationPvAffinityPodAnnotationInSvc(ctx, client, nil, nil, dep, namespace,
-			allowedTopologiesZ1Z2)
+		err = verifyPvcAnnotationPvAffinityPodAnnotationInSvc(ctx, client, nil, pod, nil, namespace,
+			allowedTopologies)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	})
