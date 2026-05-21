@@ -171,7 +171,7 @@ var _ = ginkgo.Describe("statefulset", func() {
 	*/
 
 	ginkgo.It("[ef-vanilla-block][pq-n1-vanilla-block][pq-n2-vanilla-block] [ef-stretched-svc][cf-wcp]"+
-		"[csi-block-vanilla][csi-supervisor][csi-block-vanilla-parallelized][stretched-svc] Statefulset testing wit"+
+		"[csi-block-vanilla][csi-supervisor][csi-block-vanilla-parallelized][stretched-svc] Statefulset testing with"+
 		" default podManagementPolicy", ginkgo.Label(p0, vanilla, block, wcp, core, vc70), func() {
 		ctx, cancel := context.WithCancel(context.Background())
 
